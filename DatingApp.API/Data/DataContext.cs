@@ -1,22 +1,49 @@
 using DatingApp.API.Models;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 
 namespace DatingApp.API.Data
 {
-    public class DataContext: DbContext
+    //note: this has been added beacuse "int" can be used in a database
+    //instaed of string
+    //if string is okay then you can use: DataContext: IdentityDbContext<User, Role, UserRole>
+    public class DataContext: IdentityDbContext<User, Role, int, 
+    IdentityUserClaim<int>, UserRole, IdentityUserLogin<int>,
+    IdentityRoleClaim<int>, IdentityUserToken<int>>
     {
         public DataContext(DbContextOptions<DataContext> options): base(options){}
 
 
         public DbSet<Value> Values { get; set;}
 
-        public DbSet<User> Users { get; set; }
         public DbSet<Photo> Photos { get; set; }
         public DbSet<Like> Likes { get; set; }
         public DbSet<Message> Messages { get; set; }
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
+            base.OnModelCreating(builder); //this configures scheama for entity farmework
+
+            //UserRole configuration
+            //this setup simulates one-to-many between one Role object in UserRole with
+            //many (ICollection) of UserRoles in Role object, and one User object in UserRole
+            //with many (Icollection) of UserRoles of User object.
+
+            builder.Entity<UserRole>(userRole =>
+            {
+                userRole.HasKey(ur => new {ur.UserId, ur.RoleId});
+                userRole.HasOne(ur => ur.Role)
+                   .WithMany(r => r.UserRoles) //Role object
+                   .HasForeignKey(ur => ur.RoleId) //UserRole object
+                   .IsRequired();
+
+                userRole.HasOne(ur => ur.User)
+                   .WithMany(u => u.UserRoles) //Role object
+                   .HasForeignKey(ur => ur.UserId) //UserRole object
+                   .IsRequired();
+            });
+            
             builder.Entity<Like>()
                 .HasKey(k => new {k.LikerId, k.LikeeId}); //define a key as a combination of both ids
         
@@ -45,6 +72,9 @@ namespace DatingApp.API.Data
                 .HasOne(u => u.Recipient)
                 .WithMany(m => m.MessagesReceived)
                 .OnDelete(DeleteBehavior.Restrict);
+
+             //using global query filters
+             builder.Entity<Photo>().HasQueryFilter(p => p.isApproved); //only bring bacl photos that have been approved
         }
     }
 }

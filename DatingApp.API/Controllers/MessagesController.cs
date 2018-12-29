@@ -13,7 +13,7 @@ using System;
 namespace DatingApp.API.Controllers
 {   
     [ServiceFilter(typeof(LogUserActivity))] //this will use this class to update activity date whenever any method is called fom this controller
-    [Authorize]
+    //[Authorize]: global authorization added in startup
     [Route("api/users/{userId}/[controller]")]
     [ApiController]
 
@@ -89,7 +89,7 @@ namespace DatingApp.API.Controllers
         public async Task<IActionResult> CreateMessage(int userId, MessageForCreationDto messageForCreationDto)
         {
          //make sure that user in token matches user id that was passed in the router
-             var sender = await _repo.GetUser(userId);
+             var sender = await _repo.GetUser(userId, false);
             
             if (sender.Id != int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value))
                 return Unauthorized();
@@ -97,7 +97,7 @@ namespace DatingApp.API.Controllers
             messageForCreationDto.SenderId = userId;
 
             //recipient id will be sent with the body of http post
-            var recipient = await _repo.GetUser(messageForCreationDto.RecipientId);
+            var recipient = await _repo.GetUser(messageForCreationDto.RecipientId, false);
 
             if (recipient == null)
                 return BadRequest("Could not find a recipient of the message");

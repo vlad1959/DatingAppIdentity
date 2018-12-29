@@ -14,7 +14,7 @@ namespace DatingApp.API.Controllers
     // url: http://localhost:5000/api/users
     //only authorized user can get access
     [ServiceFilter(typeof(LogUserActivity))] //this will use this class to update activity date whenever any method is called fom this controller
-    [Authorize]
+    //[Authorize]: global authorization added in Startup
     [Route("api/[controller]")]
     [ApiController]
     public class UsersController : ControllerBase
@@ -37,7 +37,7 @@ namespace DatingApp.API.Controllers
         {
             //currently logged in user - from the token
             var currentUserId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            var userFromRepo = await _repo.GetUser(currentUserId);
+            var userFromRepo = await _repo.GetUser(currentUserId, true);
             userParams.UserId = currentUserId;
             //if gender wasn't passed, then take gender from the repo object and set it to the opposite sex
             if (string.IsNullOrEmpty(userParams.Gender))
@@ -57,7 +57,9 @@ namespace DatingApp.API.Controllers
         [HttpGet("{id}", Name="GetUser")]
         public async Task<IActionResult> GetUser(int id)
         {
-            var user = await _repo.GetUser(id);
+             // compares name identiver from user's token (logged in user)  with user being retireved
+            var isCurrentUser = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value) == id;
+            var user = await _repo.GetUser(id, isCurrentUser);
             // will map source, which is user to UserForDetailedDto
             var userToReturn = _mapper.Map<UserForDetailedDto>(user);
             return Ok(userToReturn);
@@ -67,10 +69,11 @@ namespace DatingApp.API.Controllers
         public async Task<IActionResult> UpdateUser(int id, UserForUpdateDto userForUpdateDto) {
             //if id passed does not match user id in a token - return unauthorized.
            
+           
             if (id != int.Parse(User.FindFirst(ClaimTypes.NameIdentifier).Value))
                return Unauthorized();
 
-            var userFromRepo = await _repo.GetUser(id);  
+            var userFromRepo = await _repo.GetUser(id, true);  
             _mapper.Map(userForUpdateDto, userFromRepo); //will map(update) user from repo (database) with user dto
 
             if (await _repo.SaveAll())
@@ -91,7 +94,7 @@ namespace DatingApp.API.Controllers
                 return BadRequest("You already liked this user");
 
             //recipient does not exist    
-            if (await _repo.GetUser(recipientId) == null)
+            if (await _repo.GetUser(recipientId, false) == null)
                 return NotFound();
 
             like = new Like
